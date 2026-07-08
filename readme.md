@@ -54,7 +54,7 @@ on every WLED main-loop iteration.
 Add both this driver and `wled-motion_reactive` to your `custom_usermods` in `platformio_override.ini`:
 
 ```ini
-[env:myboard]
+[env:esp32dev_motion_reactive]
 extends = env:esp32dev
 custom_usermods =
   ${env:esp32dev.custom_usermods}

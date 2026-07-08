@@ -1,8 +1,22 @@
 {
   "name": "wled-imu_MPU6050",
+  "version": "0.1.0",
+  "description": "WLED driver for MPU6050 IMU for the motion_reactive usermod",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/willmmiles/wled-imu_MPU6050.git"
+  },
+  "authors":
+  {
+    "name": "Will Miles",
+    "email": "will@willmiles.net",
+    "url": "https://github.com/willmmiles/"
+  },
+  "license": "EUPL-1.2",
   "build": { "libArchive": false},
   "dependencies": {
-    "willmmiles/wled-motion_reactive": "*",
+    "willmmiles/wled-motion_reactive": "^0.1.0",
     "electroniccats/MPU6050":"1.0.1"
   }
 }
