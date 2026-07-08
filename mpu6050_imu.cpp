@@ -54,10 +54,11 @@ class MPU6050Driver : public Usermod, public IMUBase {
     struct config_t {
       bool    enabled;
       int8_t  interruptPin;
+      long    update_interval_ms; // FIFO poll interval when interruptPin is unset; ignored in interrupt mode
       int16_t gyro_offset[3];
       int16_t accel_offset[3];
     };
-    config_t config = { false, -1, {0, 0, 0}, {0, 0, 0} };
+    config_t config = { false, -1, 20, {0, 0, 0}, {0, 0, 0} };
     bool configDirty = true;
 
     // MPU control/status vars
@@ -67,6 +68,7 @@ class MPU6050Driver : public Usermod, public IMUBase {
     uint16_t packetSize = 0;     // expected DMP packet size (default is 42 bytes)
     uint16_t fifoCount  = 0;     // count of all bytes currently in FIFO
     uint8_t  fifoBuffer[64];     // FIFO storage buffer
+    decltype(millis()) next_read = 0; // polling mode only: next scheduled FIFO check
 
     Quaternion   qat;           // [w, x, y, z]  quaternion container
     VectorInt16  aa;            // [x, y, z]     raw accel sensor measurements
@@ -83,6 +85,7 @@ class MPU6050Driver : public Usermod, public IMUBase {
     static const char _name[];
     static const char _enabled[];
     static const char _interrupt_pin[];
+    static const char _update_interval_ms[];
     static const char _x_acc_bias[];
     static const char _y_acc_bias[];
     static const char _z_acc_bias[];
@@ -178,6 +181,7 @@ class MPU6050Driver : public Usermod, public IMUBase {
 
       packetSize = mpu.dmpGetFIFOPacketSize();
       fifoCount  = 0;
+      next_read  = 0;
       dmpReady   = true;
       DEBUG_PRINTF_P(PSTR("%s: Device initialized\n"), FPSTR(_name));
     }
@@ -186,9 +190,22 @@ class MPU6050Driver : public Usermod, public IMUBase {
       if (configDirty) setup();
       if (!config.enabled || !dmpReady || strip.isUpdating()) return;
 
-      // wait for MPU interrupt or extra packet(s) available
-      // mpuInterrupt is fixed on if interrupt pin is disabled
-      if (!mpuInterrupt && fifoCount < packetSize) return;
+      if (irqBound) {
+        // Interrupt mode: wait for MPU interrupt or extra packet(s) already buffered
+        if (!mpuInterrupt && fifoCount < packetSize) return;
+      } else {
+        // Polling mode: throttle FIFO checks to update_interval_ms so we don't
+        // hit the I2C bus on every WLED main-loop iteration
+        auto now   = millis();
+        auto tdiff = static_cast<long>(next_read - now);
+        if (tdiff > 0) return;
+        if (tdiff >= -config.update_interval_ms) {
+          next_read += config.update_interval_ms;
+        } else {
+          auto reads_missed = (-tdiff) / config.update_interval_ms;
+          next_read += (reads_missed + 1) * config.update_interval_ms;
+        }
+      }
 
       auto mpuIntStatus = mpu.getIntStatus();
       fifoCount = mpu.getFIFOCount();
@@ -244,14 +261,15 @@ class MPU6050Driver : public Usermod, public IMUBase {
 
     void addToConfig(JsonObject& root) override {
       JsonObject top = root.createNestedObject(FPSTR(_name));
-      top[FPSTR(_enabled)]        = config.enabled;
-      top[FPSTR(_interrupt_pin)]  = config.interruptPin;
-      top[FPSTR(_x_acc_bias)]     = config.accel_offset[0];
-      top[FPSTR(_y_acc_bias)]     = config.accel_offset[1];
-      top[FPSTR(_z_acc_bias)]     = config.accel_offset[2];
-      top[FPSTR(_x_gyro_bias)]    = config.gyro_offset[0];
-      top[FPSTR(_y_gyro_bias)]    = config.gyro_offset[1];
-      top[FPSTR(_z_gyro_bias)]    = config.gyro_offset[2];
+      top[FPSTR(_enabled)]            = config.enabled;
+      top[FPSTR(_interrupt_pin)]      = config.interruptPin;
+      top[FPSTR(_update_interval_ms)] = config.update_interval_ms;
+      top[FPSTR(_x_acc_bias)]         = config.accel_offset[0];
+      top[FPSTR(_y_acc_bias)]         = config.accel_offset[1];
+      top[FPSTR(_z_acc_bias)]         = config.accel_offset[2];
+      top[FPSTR(_x_gyro_bias)]        = config.gyro_offset[0];
+      top[FPSTR(_y_gyro_bias)]        = config.gyro_offset[1];
+      top[FPSTR(_z_gyro_bias)]        = config.gyro_offset[2];
     }
 
     bool readFromConfig(JsonObject& root) override {
@@ -259,14 +277,15 @@ class MPU6050Driver : public Usermod, public IMUBase {
       JsonObject top = root[FPSTR(_name)];
 
       bool configComplete = !top.isNull();
-      configComplete &= getJsonValue(top[FPSTR(_enabled)],       config.enabled,       false);
-      configComplete &= getJsonValue(top[FPSTR(_interrupt_pin)], config.interruptPin, (int8_t)-1);
-      configComplete &= getJsonValue(top[FPSTR(_x_acc_bias)],    config.accel_offset[0], (int16_t)0);
-      configComplete &= getJsonValue(top[FPSTR(_y_acc_bias)],    config.accel_offset[1], (int16_t)0);
-      configComplete &= getJsonValue(top[FPSTR(_z_acc_bias)],    config.accel_offset[2], (int16_t)0);
-      configComplete &= getJsonValue(top[FPSTR(_x_gyro_bias)],   config.gyro_offset[0],  (int16_t)0);
-      configComplete &= getJsonValue(top[FPSTR(_y_gyro_bias)],   config.gyro_offset[1],  (int16_t)0);
-      configComplete &= getJsonValue(top[FPSTR(_z_gyro_bias)],   config.gyro_offset[2],  (int16_t)0);
+      configComplete &= getJsonValue(top[FPSTR(_enabled)],            config.enabled,            false);
+      configComplete &= getJsonValue(top[FPSTR(_interrupt_pin)],      config.interruptPin,       (int8_t)-1);
+      configComplete &= getJsonValue(top[FPSTR(_update_interval_ms)], config.update_interval_ms, (long)20);
+      configComplete &= getJsonValue(top[FPSTR(_x_acc_bias)],         config.accel_offset[0],    (int16_t)0);
+      configComplete &= getJsonValue(top[FPSTR(_y_acc_bias)],         config.accel_offset[1],    (int16_t)0);
+      configComplete &= getJsonValue(top[FPSTR(_z_acc_bias)],         config.accel_offset[2],    (int16_t)0);
+      configComplete &= getJsonValue(top[FPSTR(_x_gyro_bias)],        config.gyro_offset[0],     (int16_t)0);
+      configComplete &= getJsonValue(top[FPSTR(_y_gyro_bias)],        config.gyro_offset[1],     (int16_t)0);
+      configComplete &= getJsonValue(top[FPSTR(_z_gyro_bias)],        config.gyro_offset[2],     (int16_t)0);
 
       DEBUG_PRINT(F("MPU6050: "));
       if (top.isNull()) {
@@ -295,6 +314,7 @@ class MPU6050Driver : public Usermod, public IMUBase {
 const char MPU6050Driver::_name[]           PROGMEM = "MPU6050_IMU";
 const char MPU6050Driver::_enabled[]        PROGMEM = "enabled";
 const char MPU6050Driver::_interrupt_pin[]  PROGMEM = "interrupt_pin";
+const char MPU6050Driver::_update_interval_ms[] PROGMEM = "update_interval_ms";
 const char MPU6050Driver::_x_acc_bias[]     PROGMEM = "x_acc_bias";
 const char MPU6050Driver::_y_acc_bias[]     PROGMEM = "y_acc_bias";
 const char MPU6050Driver::_z_acc_bias[]     PROGMEM = "z_acc_bias";

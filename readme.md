@@ -39,11 +39,13 @@ All settings are in WLED's Usermod Settings page under **MPU6050_IMU**:
 |---|---|---|
 | enabled | false | Enable the driver |
 | interrupt_pin | -1 | GPIO wired to the MPU6050 INT pin; -1 polls the FIFO instead of using an interrupt |
+| update_interval_ms | 20 | FIFO poll interval when `interrupt_pin` is -1 (ignored in interrupt mode) |
 | x/y/z_gyro_bias | 0 | Gyro offset calibration (raw sensor units) |
 | x/y/z_acc_bias | 0 | Accelerometer offset calibration (raw sensor units) |
 
 An interrupt pin is not required -- the driver falls back to polling the FIFO
-count each `loop()` when `interrupt_pin` is -1.
+count at `update_interval_ms` when `interrupt_pin` is -1, rather than checking
+on every WLED main-loop iteration.
 
 ## Building
 
