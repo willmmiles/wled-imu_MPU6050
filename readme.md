@@ -8,7 +8,9 @@ The MPU-6050 has a built-in Digital Motion Processor (DMP) that fuses the gyro a
 accelerometer readings on-chip, providing a gravity vector and gravity-free
 ("linear") acceleration directly -- no software filter is needed.
 
-_Story:_
+Original implementation by Jonathan Diamond <feros32@gmail.com>; this descendent maintained by Will Miles <will@willmiles.net>
+
+_Jonathan's Original Story:_
 
 As a memento to a long trip I was on, I built an icosahedron globe. I put lights inside to indicate cities I travelled to.
 

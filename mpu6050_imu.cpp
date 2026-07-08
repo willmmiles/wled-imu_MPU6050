@@ -5,6 +5,8 @@
    acceleration output and provides it to the motion_reactive IMU accessor.
    The DMP does the sensor fusion in hardware, so no software filter is needed.
    Adapted from https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/MPU6050/examples/MPU6050_DMP6_ESPWiFi
+   Original WLED usermod written by Jonathan Diamond <feros32@gmail.com>
+   This descendent maintained by Will Miles <will@willmiles.net>
 */
 
 #include "I2Cdev.h"
@@ -325,8 +327,4 @@ const char MPU6050Driver::_z_gyro_bias[]    PROGMEM = "z_gyro_bias";
 
 static MPU6050Driver mpu6050_imu;
 REGISTER_USERMOD(mpu6050_imu);
-
-// Compile-time provider registration: strong definition overrides the weak
-// default in motion_reactive.cpp.  Linking two IMU drivers simultaneously
-// produces a duplicate-symbol error -- the correct behavior.
 IMUBase* IMU_getProvider() { return &mpu6050_imu; }
