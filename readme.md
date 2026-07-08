@@ -1,71 +1,61 @@
-# WLED usermod example
+# wled-imu_MPU6050
 
-This repository is a [GitHub template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template) for building your own [WLED](https://github.com/wled/WLED) usermod as a standalone project. Create a new repository from it, add your code, link it to WLED, and make the world a brighter place!
+WLED usermod driver for the MPU-6050 six-axis IMU (accelerometer + gyroscope).
 
-## Getting started
+Provides IMU data to the [wled-motion_reactive](https://github.com/willmmiles/wled-motion_reactive) usermod, which implements motion-reactive LED effects for staffs, wands, and other moving props.
 
-### 1. Create from template
+The MPU-6050 has a built-in Digital Motion Processor (DMP) that fuses the gyro and
+accelerometer readings on-chip, providing a gravity vector and gravity-free
+("linear") acceleration directly -- no software filter is needed.
 
-Click **Use this template** → **Create a new repository** on GitHub. You get a clean copy to start building your project from. Then:
+_Story:_
 
-- Rename `usermod_example.cpp` to something descriptive (e.g. `my_sensor.cpp`)
-- Rename the class inside from `MyExampleUsermod` to match
-- Update `"name"` in `library.json` to match your repository name
+As a memento to a long trip I was on, I built an icosahedron globe. I put lights inside to indicate cities I travelled to.
 
-### 2. Wire it into your WLED build
+I wanted to integrate an IMU to allow either on-board, or off-board effects that would
+react to the globes orientation. See the blog post on building it <https://www.robopenguins.com/icosahedron-travel-globe/> or a video demo <https://youtu.be/zYjybxHBsHM> .
 
-Clone your new repository alongside your WLED checkout:
+## Wiring
 
+The connections needed to the MPU6050 are as follows:
 ```
-~/projects/
-  WLED/
-  my-wled-usermod/
-    library.json
-    my_sensor.cpp
+  VCC     VU (5V USB)   Not available on all boards so use 3.3V if needed.
+  GND     G             Ground
+  SCL     D1 (GPIO05)   I2C clock
+  SDA     D2 (GPIO04)   I2C data
+  XDA     not connected
+  XCL     not connected
+  AD0     not connected
+  INT     D8 (GPIO15)   Interrupt pin (optional, see below)
 ```
 
-In `platformio_override.ini` inside the WLED folder, add a `symlink://` reference to your local clone:
+Configure the I²C pins in WLED's LED Settings → Hardware page.
+
+## Configuration
+
+All settings are in WLED's Usermod Settings page under **MPU6050_IMU**:
+
+| Setting | Default | Description |
+|---|---|---|
+| enabled | false | Enable the driver |
+| interrupt_pin | -1 | GPIO wired to the MPU6050 INT pin; -1 polls the FIFO instead of using an interrupt |
+| x/y/z_gyro_bias | 0 | Gyro offset calibration (raw sensor units) |
+| x/y/z_acc_bias | 0 | Accelerometer offset calibration (raw sensor units) |
+
+An interrupt pin is not required -- the driver falls back to polling the FIFO
+count each `loop()` when `interrupt_pin` is -1.
+
+## Building
+
+Add both this driver and `wled-motion_reactive` to your `custom_usermods` in `platformio_override.ini`:
 
 ```ini
-[env:esp32dev]
+[env:myboard]
 extends = env:esp32dev
 custom_usermods =
   ${env:esp32dev.custom_usermods}
-  symlink:///home/you/projects/my-wled-usermod
+  file:///path/to/wled-motion_reactive
+  file:///path/to/wled-imu_MPU6050
 ```
 
-Both projects are now open in the same VS Code session. PlatformIO picks up your changes on each build.
-
-### 3. Share it
-
-Once ready, others can reference your usermod directly by URL — no local clone needed:
-
-```ini
-custom_usermods =
-  ${env:esp32dev.custom_usermods}
-  symlink://github.com/you/my-wled-usermod.git#main
-```
-
-## What's in this repo
-
-**`library.json`** — PlatformIO library manifest. The `"libArchive": false` setting is required; without it the build will fail. Add any library dependencies here.
-
-**`usermod_example.cpp`** — A fully annotated example covering all available lifecycle hooks:
-
-| Method | When called |
-|---|---|
-| `setup()` | Once at boot, after config is loaded, before WiFi |
-| `connected()` | Each time WiFi (re)connects |
-| `loop()` | Every main loop iteration |
-| `addToJsonInfo()` | When `/json/info` is requested |
-| `addToJsonState()` / `readFromJsonState()` | On `/json/state` get/post |
-| `addToConfig()` / `readFromConfig()` | Persistent settings in `cfg.json` |
-| `appendConfigData()` | When the Usermod Settings page renders |
-| `handleOverlayDraw()` | Just before each LED strip update |
-| `handleButton()` | On button events |
-| `onMqttMessage()` / `onMqttConnect()` | MQTT events |
-| `onStateChange()` | When WLED state changes |
-
-`REGISTER_USERMOD(instance)` at the bottom of the file handles self-registration — there is no `usermods_list.cpp` to edit.
-
-For full documentation see the [WLED Custom Features](https://kno.wled.ge/advanced/custom-features/) page.
+Or reference published repos directly by URL once available.

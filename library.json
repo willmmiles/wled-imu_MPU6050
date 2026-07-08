@@ -1,7 +1,8 @@
 {
-  "name": "wled-usermod-example",
-  "build": {
-    "libArchive": false
-  },
-  "dependencies": {}
+  "name": "wled-imu_MPU6050",
+  "build": { "libArchive": false},
+  "dependencies": {
+    "willmmiles/wled-motion_reactive": "*",
+    "electroniccats/MPU6050":"1.0.1"
+  }
 }
