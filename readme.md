@@ -58,8 +58,6 @@ Add both this driver and `wled-motion_reactive` to your `custom_usermods` in `pl
 extends = env:esp32dev
 custom_usermods =
   ${env:esp32dev.custom_usermods}
-  file:///path/to/wled-motion_reactive
-  file:///path/to/wled-imu_MPU6050
+  wled-motion_reactive = https://github.com/willmmiles/wled-motion_reactive.git
+  wled-imu_MPU6050 = https://github.com/willmmiles/wled-imu_MPU6050.git
 ```
-
-Or reference published repos directly by URL once available.
